@@ -2,12 +2,12 @@
 
 This is the code repository for "Naming practice and gender equality progress in Javanese society: A computational approach".
 
-The full manuscript is available in this link: https://osf.io/preprints/socarxiv/dacu7/
+The full manuscript is available through this link: https://osf.io/preprints/socarxiv/dacu7/
 <br>The preliminary findings was presented at the 2021 IC2S2.
 
 <br>
 
-<b>Until published, please cite as:</b>
+<b>This manuscript is currently under review. For the time being, please cite as:</b>
 
 APA
 <br>
