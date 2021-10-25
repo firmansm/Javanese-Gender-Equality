@@ -1,0 +1,551 @@
+---
+title: "Javanese Names and Gender Equality Progress"
+author: "Firman M Firmansyah"
+date: "March 18, 2021"
+output: html_document
+---
+
+These codes are supplementary materials for the following manuscript.
+
+APA
+Firmansyah, F. M., Pratama, A. R., & Wijayanto, A. W. (2021, October 7). Naming Practice and Gender Equality Progress in Javanese Society: A Computational Approach. https://doi.org/10.31235/osf.io/dacu7
+
+IEEE
+F. M. Firmansyah, A. R. Pratamaand A. W. Wijayanto, “Naming Practice and Gender Equality Progress in Javanese Society: A Computational Approach”, 07-Oct-2021. [Online]. Available: osf.io/preprints/socarxiv/dacu7.
+
+# PREPARATION
+## Required Library
+
+```{r, results='hide', message=FALSE, echo=FALSE, warning=FALSE}
+
+library(tidyverse)
+options(dplyr.summarise.inform = FALSE)
+library(summarytools)
+library(rstatix)
+
+```
+
+## Dataset
+### Attach original Central Java dataset
+This data set is needed to perform: IDENTIFYING, CLEANING, and COUNTING. 
+
+```{r}
+
+central_java_df <- read_rds(file.choose()) #original data set scrapped from KPU's website: jateng.rds
+central_java_df$ID <- 1:nrow(central_java_df) #create new ID
+
+```
+
+### Attach/save counted dataset
+This data set results from IDENTIFYING, CLEANING, and COUNTING.
+
+```{r}
+
+#saveRDS(javanese_native_df, file = "javanese_native_df.rds") #non running
+
+#attach dataset
+javanese_native_df <- readRDS("javanese_native_df.rds")
+
+```
+
+### Save Shared dataset
+This data set is anonymous, consisting of native (place of birth: urban, suburb, rural), year of birth (YOB), gender, name length, and character length. 
+
+```{r}
+
+anon_javanese_native_df <- javanese_native_df[,c(3:5,8:9)]
+
+#saveRDS(anon_javanese_native_df, file = "anon_javanese_native_df.rds")
+
+```
+
+
+## Functions
+### identify_pob
+This function maps place of birth (POB) to: urban, suburb, rural, and migrant.
+
+```{r}
+
+identify_pob <- function(x) {
+  if (x %in% cj_urban) {
+    y <- "urban"
+  }
+  else if (x %in% cj_suburb) {
+    y <- "suburb"
+  }
+  else if (x %in% cj_rural) {
+    y <- "rural"
+  }
+  else {
+    y <- "migrant"
+  }
+  return(y)
+}
+
+```
+
+### nwords
+This function counts numbers of words in a name (as words).
+
+```{r}
+
+nwords <- function(x) {
+  y <- str_count(x, "\\S+")
+  return(y)
+}
+
+```
+
+### ncharacters
+This function counts numbers of characters in a name (as characters).
+
+```{r}
+
+ncharacters <- function(x) {
+  y <- str_replace_all(x, pattern=" ", repl="")
+  z <- nchar(y)
+  return(z)
+}
+
+```
+
+### stn_err
+This function calculates standard errors (se).
+It is needed to perform DESCRIPTIVE STATS.
+
+```{r}
+
+stn_err <- function(x) {
+  y <- sd(x)/sqrt(length(x))
+  return(y)
+}
+
+```
+
+
+# IDENTIFYING
+## Identifying place of birth (POB)
+Only those who were born and voted in Central Java are deemed native Javanese.
+People who were born in Special Region of Yogyakarta or East Java, even though may be Javanese too, are excluded from the analysis.
+
+```{r}
+
+javanese_df <- tibble(ID=central_java_df$ID, POB=central_java_df$TL) # create a new tibble, with place of birth
+
+javanese_df$POB <- str_replace_all(javanese_df$POB, "[^[:alnum:]]", " ") # clear place of birth
+javanese_df$POB <- str_replace_all(javanese_df$POB, pattern=" ", repl="") # remove space
+
+# only include place of birth with N >= 50
+place_of_birth <- javanese_df %>%
+  group_by(POB) %>%
+  summarise(N = length(ID)) %>%
+  arrange(desc(N), POB) %>%
+  filter(N >= 50)
+
+place_of_birth
+
+# list of urban, suburb, and rural areas in Central Java
+
+cj_urban <- c("tegal", "magelang", "semarang", "pekalongan", "surakarta", "salatiga", "solo", "kotasemarang", "kotamagelang", "magelamg") 
+              
+cj_suburb <- c("brebes", "brebbes", "kabbrebes", "klaten", "kabklaten", "kabsemarang", "sukoharjo", "purwokerto", "kabtegal", "purwodadi", "ambarawa", "ungaran", "kabkaranganyar", "gombong", "kutoarjo", "cepu", "kabmagelang", "bumiayu", "karangamyar", "kabupatentegal", "muntilan", "kabupatensemarang", "karangayar", "kabsmg", "kendal", "demak", "karayanganyar", "batang", "kabupatenkendal", "kabbatang", "kabkendal", "kabdemak") 
+                             
+cj_rural <- c("cilacap", "banyumas", "kebumen", "grobogan", "pemalang", "pati", "banjarnegara", "jepara", "blora", "boyolali", "wonogiri", "kudus", "temanggung", "wonosobo", "sragen", "purbalingga", "purworejo", "rembang", "kabrembang", "kabjepara", "kabboyolali", "kabcilacap", "kabbanyumas", "kabpurbalingga", "rembamg", "kabrembamg", "pemalamg", "purbalimgga", "temamggung", "kabpati", "kabgrobogan", "kabblora" , "bajarnegara", "bamjarnegara", "kabkudus", "kabtemanggung", "kabpemalang", "bamyumas", "cicacap", "kabsragen")
+
+javanese_df$NATIVE <- apply(javanese_df[,2], 1, identify_pob) # apply function to map place of birth, javanese_df[,2] refers to place of birth
+
+javanese_native_df <- javanese_df %>% # exclude those who born not in Central Java
+  filter(NATIVE != "migrant")
+
+javanese_native_df
+
+```
+
+## Identifying year of birth (YOB)
+It uses National ID Card numbers to identify people's year of birth.
+
+```{r}
+
+##add year of birth
+javanese_native_df <- left_join(javanese_native_df, central_java_df[,c(5,9)], by="ID") # 5 refers to NIK, 9 refers to ID
+javanese_native_df$NIK <- apply(javanese_native_df[,4], 2, FUN=str_sub, start=-6, end=-5) # 4 refers to NIK
+names(javanese_native_df)[names(javanese_native_df) == "NIK"] <- "YOB" # rename NIK with YOB
+javanese_native_df$YOB <- as.integer(javanese_native_df$YOB)
+
+#get rid of errors / no YOB
+javanese_native_df <- na.omit(javanese_native_df)
+which(is.na(javanese_native_df))
+
+#make four digits YOB
+javanese_native_df$YOB <- ifelse(javanese_native_df$YOB < 2, javanese_native_df$YOB+2000, javanese_native_df$YOB+1900)
+
+#focus those born in 1945-2001
+javanese_native_df <- javanese_native_df %>%
+  filter(YOB >= 1945)
+
+```
+
+## Identifying gender
+Genders are derived from people's sex as listed in their national ID cards.
+
+```{r}
+
+javanese_native_df <- left_join(javanese_native_df, central_java_df[,8:9], by="ID") # 8 refers to sex, 9 to ID
+names(javanese_native_df)[names(javanese_native_df) == "JK"] <- "GENDER" # change column's name JK to Sex
+javanese_native_df$GENDER <- recode_factor(javanese_native_df$GENDER, "l" = "male", "p" = "female") # change l to make, p to female
+
+```
+
+
+# CLEANING 
+## Remove symbols
+
+```{r}
+
+javanese_native_df <- left_join(javanese_native_df, central_java_df[,c(6,9)], by="ID") # add names, 6 refers to names, 9 to ID
+names(javanese_native_df)[names(javanese_native_df) == "NAMA"] <- "NAME" # change column name 
+
+javanese_native_df$NAME <- str_replace_all(javanese_native_df$NAME, '\\.|,', " ") #get rid of periods and commas
+
+```
+
+
+## Remove titles
+
+get rid of all acquired titles
+academics: se, s pd, sh, st, spd, drs, dra, amd, a md, ba, mm, s ag, dr, sp, s pd i, bsc, msi, s psi, ss, mt, s sos, s h, mh, s ip, ssi
+religious and cultural: h, hj, ny
+
+```{r}
+
+acqtitles <- "\\bh\\b|\\bse\\b|\\bhj\\b|\\bs pd\\b|\\bny\\b|\\bsh\\b|\\bst\\b|\\bspd\\b|\\bdrs\\b|\\bdra\\b|\\bamd\\b|\\ba md\\b|\\bba\\b |\\bmm\\b|\\bs ag\\b|\\bdr\\b|\\bsp\\b|\\bs pd i\\b|\\bbsc\\b|\\bmsi\\b|\\bs psi\\b|\\bss\\b|\\bmt\\b|\\bs sos\\b|\\bs h\\b|\\bs ip\\b|\\bssi\\b|\\bdrg\\b|\\bmh\\b"
+
+javanese_native_df$CLEANNAME <- str_remove_all(javanese_native_df$NAME, acqtitles)
+
+```
+
+
+
+# COUNTING
+## Count lenghts of words
+
+```{r}
+
+javanese_native_df$NAMELEN <- apply(javanese_native_df[,7], 1, nwords) #7 refers to clean name
+
+# get rid of NAs to avoid errors 
+which(is.na(javanese_native_df))
+javanese_native_df <- na.omit(javanese_native_df)
+which(is.na(javanese_native_df))
+
+```
+
+## Count lenghts of characters
+
+```{r}
+
+javanese_native_df$CHARLEN <- apply(javanese_native_df[,7], 1, ncharacters) #7 refers to clean name
+
+# get rid of NAs to avoid errors 
+which(is.na(javanese_native_df))
+javanese_native_df <- na.omit(javanese_native_df)
+which(is.na(javanese_native_df))
+
+```
+
+
+## Calculate PCA scores
+
+```{r}
+
+# PCA on all
+javanese_native_df$PCA <- princomp(javanese_native_df[,8:9], cor=T, scores=T)$scores[,1] #8, 9 referst to name length and characters lenth
+
+which(is.na(javanese_native_df))
+javanese_native_df
+
+```
+
+PCA summary
+
+```{r}
+
+pca_namelenght <- princomp(javanese_native_df[,8:9], cor=T, scores=T)
+summary(pca_namelenght)
+pca_namelenght$loadings
+
+```
+
+
+
+# DESCRIPTIVE STATS
+This section requires javanese_native_df data set.
+## Tables
+
+### Numbers of Javanese people
+
+for manuscript
+
+```{r}
+
+tab_javanese_people <- javanese_native_df %>% 
+  mutate(YOB = cut(YOB, breaks = 7)) %>%
+  group_by(NATIVE, YOB, GENDER) %>%
+  summarise(N_PEOPLE = length(ID)) %>%
+  pivot_wider(names_from = c(GENDER, NATIVE), values_from = N_PEOPLE)
+
+tab_javanese_people
+
+```
+
+for supplementary material 1
+
+```{r}
+
+supp_1 <- javanese_native_df %>% 
+  group_by(NATIVE, YOB, GENDER) %>%
+  summarise(N_PEOPLE = length(ID)) %>%
+  pivot_wider(names_from = c(GENDER, NATIVE), values_from = N_PEOPLE)
+
+supp_1
+
+```
+
+### Length of names
+
+for manuscript:
+
+with YOB, POB, and Gender (3 columns)
+
+```{r}
+
+tab_javanese_names_chars_3col <- javanese_native_df %>% 
+  group_by(YOB, NATIVE, GENDER) %>%
+  summarise(LEN_NAMES = round(mean(NAMELEN, na.rm=T), 2), SD_NAMES = round(sd(NAMELEN, na.rm = T), 2), SE_NAMES = round(stn_err(NAMELEN), 2),
+            LEN_CHARS = round(mean(CHARLEN, na.rm=T), 2), SD_CHARS = round(sd(CHARLEN, na.rm = T), 2), SE_CHARS = round(stn_err(CHARLEN), 2))
+
+tab_javanese_names_chars_3col
+
+```
+
+for supplementary material 2
+
+```{r}
+
+supp_2 <- tab_javanese_names_chars_3col %>% 
+pivot_wider(names_from = c(GENDER, NATIVE), values_from = LEN_NAMES:SE_CHARS)
+
+supp_2
+
+```
+
+## Visualization
+
+### Length of names with sd
+
+```{r, warning=F}
+
+tab_fig_name_char3 <- tab_javanese_names_chars_3col %>%
+  pivot_longer(c(LEN_NAMES, LEN_CHARS), names_to = "Names", values_to = "LENGTH")
+
+tab_fig_name_char3$Names <- recode_factor(tab_fig_name_char3$Names, "LEN_CHARS" = "Number of Characters", "LEN_NAMES" = "Number of Words")
+tab_fig_name_char3$NATIVE <- recode_factor(tab_fig_name_char3$NATIVE, "urban" = "Urban", "suburb" = "Suburb", "rural" = "Rural")
+
+tab_fig_name_char3$SD <- as.double(NA)
+
+tab_fig_name_char3[tab_fig_name_char3$Names == "Number of Words", ]$SD <- tab_fig_name_char3[tab_fig_name_char3$Names == "Number of Words", ]$SD_NAMES
+tab_fig_name_char3[tab_fig_name_char3$Names == "Number of Characters", ]$SD <- tab_fig_name_char3[tab_fig_name_char3$Names == "Number of Characters", ]$SD_CHARS
+
+#neworder <- c("numbers of names","numbers of characters")
+#tab_fig_name_char2 <- arrange(transform(tab_fig_name_char2, Names=factor(Names,levels=neworder)),Names)
+
+fig_name_char_sd_col3 <- tab_fig_name_char3 %>%
+  ggplot(aes(x = YOB, y = LENGTH, fill = GENDER, color = GENDER)) +
+  geom_ribbon(aes(ymin = (LENGTH - SD), ymax = (LENGTH + SD)), linetype = 0, alpha = 0.17, show.legend = F) +
+  geom_line(aes(y = LENGTH), size = 1.5) + scale_x_discrete(name = "Year of Birth", limits = seq(1945, 2001, 7)) + ylab("Mean") + 
+  labs(title="The Length of Javanese People's Names Sorted by Year of Birth", 
+      color="Gender:")  + 
+  facet_grid(Names~NATIVE, scales = "free_y") +
+  scale_fill_manual(breaks = c("male", "female"), values=c("#0F3460", "#E94560")) + 
+  scale_color_manual(breaks = c("male", "female"), values=c("#0F3460", "#E94560")) + 
+  theme(axis.text.x = element_text(angle = 45), panel.spacing.x = unit(1.5, "lines")) 
+# + scale_color_manual(values=c("black", "#999999")) + scale_fill_manual(values=c("darkgrey", "lightgrey"))
+
+fig_name_char_sd_col3 + 
+  theme(#plot.title = element_text(hjust = 0.5),
+        legend.position = "top")
+
+```
+
+### Length of names with standard error
+
+```{r, warning=F}
+
+tab_fig_name_char3$SE <- as.double(NA)
+
+tab_fig_name_char3[tab_fig_name_char3$Names == "Number of Words", ]$SE <- tab_fig_name_char3[tab_fig_name_char3$Names == "Number of Words", ]$SE_NAMES
+tab_fig_name_char3[tab_fig_name_char3$Names == "Number of Characters", ]$SE <- tab_fig_name_char3[tab_fig_name_char3$Names == "Number of Characters", ]$SE_CHARS
+
+#neworder <- c("numbers of names","numbers of characters")
+#tab_fig_name_char2 <- arrange(transform(tab_fig_name_char2, Names=factor(Names,levels=neworder)),Names)
+
+fig_name_char_se_col <- tab_fig_name_char3 %>%
+  ggplot(aes(x = YOB, y = LENGTH, fill = GENDER, color = GENDER)) +
+  geom_ribbon(aes(ymin = (LENGTH - SE), ymax = (LENGTH + SE)), linetype = 0, alpha = 0.17, show.legend = F) +
+  geom_line(aes(y = LENGTH), size = 1.5) + scale_x_discrete(name = "Year of Birth", limits = seq(1945, 2001, 7)) + ylab("Mean") + 
+  labs(title="The Length of Javanese People's Names Sorted by Year of Birth",
+       color="Gender")  + 
+  facet_grid(Names~NATIVE, scales = "free_y") + #+ theme(axis.text.x = element_text(angle = 90)) # + scale_color_manual(values=c("black", "#999999")) + scale_fill_manual(values=c("darkgrey", "lightgrey"))
+  scale_fill_manual(breaks = c("male", "female"), values=c("#0F3460", "#E94560")) + 
+  scale_color_manual(breaks = c("male", "female"), values=c("#0F3460", "#E94560")) + 
+  theme(axis.text.x = element_text(angle = 45), panel.spacing.x = unit(1.5, "lines")) 
+  
+fig_name_char_se_col +
+    theme(#plot.title = element_text(hjust = 0.5),
+        legend.position = "top")
+
+```
+
+
+# INFERENTIAL STATS
+## T-test on PCA score 
+ttest_results_PCA
+ttest_results_list_PCA
+theshold for significant: .001
+
+
+
+```{r}
+
+# create a tibble for t-test results
+YOB <- c(seq(1945,2001)) #year of birth
+POB <- c("urban", "suburb", "rural") #place of birth
+ATV <- NA #t statistics 
+PVL <- NA #p value for gender
+ttest_results_PCA <- tibble(expand.grid(YOB, POB), ATV, PVL)
+colnames(ttest_results_PCA) <- c("YOB", "POB", "ATV", "PVL")
+
+# helper
+# create a vector to summarize t-test results
+ttest_results_list_PCA <- vector(mode="list", length = nrow(ttest_results_PCA))
+# for loops for t-test
+for(i in 1:nrow(ttest_results_PCA)) {
+  ttest_results_list_PCA[[i]] <- t.test(PCA ~ GENDER, data=javanese_native_df[javanese_native_df$YOB==ttest_results_PCA$YOB[i] & javanese_native_df$NATIVE==ttest_results_PCA$POB[i], ])
+}
+
+# put values back to the t-test tibble
+for(i in 1:nrow(ttest_results_PCA)) {
+  ttest_results_PCA$ATV[i] <- ttest_results_list_PCA[[i]]$statistic #no absolute, t statistics
+  ttest_results_PCA$PVL[i] <- round(ttest_results_list_PCA[[i]]$p.value, 5)
+}
+
+# add significant levels
+ttest_results_PCA$SIG <- NA
+for(i in 1:nrow(ttest_results_PCA)) {
+  if (ttest_results_PCA$PVL[i] >= .001) {
+    ttest_results_PCA$SIG[i] <- "no"
+  }
+  else {
+    ttest_results_PCA$SIG[i] <- "yes"
+  }
+}
+
+ttest_results_PCA
+
+```
+
+for supplementary material 3
+
+```{r}
+
+supp_3 <- ttest_results_PCA %>% 
+  select(-SIG) %>% 
+  pivot_wider(names_from = c(POB), values_from = ATV:PVL)
+
+supp_3
+
+```
+
+## Viz T-test on PCA (all)
+ttest_results__PCA 
+
+```{r, warning=F}
+
+nosig_x <- as.list(ttest_results_PCA[ttest_results_PCA$SIG=="no", 1]) #1 refers to YOB
+nosig_y <- as.list(ttest_results_PCA[ttest_results_PCA$SIG=="no", 3]) #1 refers to ATV
+nosig_z <- as.list(ttest_results_PCA[ttest_results_PCA$SIG=="no", 2]) #2 refers to POB 
+ann_dot <- data.frame(nosig_x, nosig_y, nosig_z)
+
+POB_labels <- c("Urban", "Suburb", "Rural" )
+names(POB_labels) <- c("urban", "suburb", "rural")
+
+fig_ttest_results_PCA_col <- ttest_results_PCA %>%
+  ggplot(aes(x=YOB, y=ATV)) + geom_line(size=1.2, color="#D55E00") + scale_x_discrete(name="Year of Birth", limits=seq(1945, 2001, 7)) + ylab("T-Statistics") + 
+  ggtitle("Gender differences in Javanese people's full names") + 
+  labs(caption=" \u2022 = not significant, p > .001") + geom_point(data=ann_dot, color="black") + 
+  facet_wrap(~POB,
+             labeller = labeller(POB = POB_labels)) + 
+  theme(panel.spacing.x = unit(1.2, "lines")) + 
+  theme(axis.text.x = element_text(angle = 45)) +
+  theme(plot.margin = unit(c(0.2,.5,0.2,0.2), "cm")) #t,r, b, l
+
+fig_ttest_results_PCA_col
+
+```
+
+## Cohen's D effect size on PCA score
+
+```{r}
+
+# create a tibble for Cohen's D effect size results
+YOB <- c(seq(1945,2001)) #year of birth
+POB <- c("urban", "suburb", "rural") #place of birth
+EFS <- NA #effect size
+MAG <- NA #magnitude
+cohenD_results_PCA <- tibble(expand.grid(YOB, POB), EFS, MAG)
+colnames(cohenD_results_PCA) <- c("YOB", "POB", "EFS", "MAG")
+
+# helper
+# create a vector to summarize effect size results
+cohenD_results_list_PCA <- vector(mode="list", length = nrow(cohenD_results_PCA))
+# for loops for t-test
+for(i in 1:nrow(cohenD_results_PCA)) {
+  cohenD_results_list_PCA[[i]] <- cohens_d(PCA ~ GENDER, data=javanese_native_df[javanese_native_df$YOB == cohenD_results_PCA$YOB[i] & javanese_native_df$NATIVE == cohenD_results_PCA$POB[i], ])
+}
+
+# put values back to the Cohen's D tibble
+for(i in 1:nrow(cohenD_results_PCA)) {
+  cohenD_results_PCA$EFS[i] <- round(cohenD_results_list_PCA[[i]]$effsize,3) #no absolute
+  cohenD_results_PCA$MAG[i] <- cohenD_results_list_PCA[[i]]$magnitude
+}
+
+cohenD_results_PCA
+
+```
+for supplementary material 4
+
+```{r}
+
+supp_4 <- cohenD_results_PCA %>% 
+  select(-MAG) %>% 
+  pivot_wider(names_from = c(POB), values_from = EFS)
+
+supp_4
+
+```
+
+## Viz Cohen's D on PCA score
+
+```{r}
+
+cohenD_results_PCA %>%
+  ggplot(aes(x=YOB, y=EFS)) + geom_line(size=1.2, color="#16697A") + scale_x_discrete(name="Year of Birth", limits=seq(1945, 2001, 7)) + ylab("Effect Size") + 
+  ggtitle("Gender differences in Javanese people's full names") + 
+  labs(caption=".00 = negligible, .20 = small, .50 = moderate, .80 = large") + 
+  facet_wrap(~POB,
+             labeller = (labeller(POB = POB_labels))) + theme(panel.spacing.x = unit(1.5, "lines")) + 
+  theme(axis.text.x = element_text(angle = 45)) + ylim(-.15, 1) +
+  geom_hline(yintercept = c(.2, .5, .8), color=c("darkgrey")) +
+  theme(plot.margin = unit(c(0.2,.5,0.2,0.2), "cm")) #t,r, b, l
+
+```
