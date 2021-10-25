@@ -1,0 +1,5 @@
+NATIVE: place of birth; values: rural, suburb, urban
+YOB: year of birth
+GENDER: male, female
+NAMELEN: number of names (words)
+CHARLEN: number of characters in a name
