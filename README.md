@@ -21,10 +21,10 @@ F. M. Firmansyah, A. R. Pratamaand A. W. Wijayanto, “Naming Practice and Gende
 
 <b>Directory</b>
 - data: anonymized data set used in the study
-- markdown: R codes
+- map: R codes and Central Java map in png
+- markdown: R codes for all analyses
 - plots: produced plots in png
-- map: Central Java map in png
-- results: analysis results for PCA, Welch's t-test, and Cohen's D effect size
+- tables: analysis results for descriptive and inferential statistics
 
 <br>
 Please contact Firman M. Firmansyah at manda[dot]firmansyah[at]stonybrook[dot]edu for any questions and suggestions.
